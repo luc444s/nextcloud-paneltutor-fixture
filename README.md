@@ -16,10 +16,12 @@ Use `compose.yaml` and select `app:8080` as the ingress when required.
 
 ## Required environment
 
-Configure these values in PanelTutor Apps; never commit them:
+PanelTutor Apps automatically generates and injects the stable encrypted
+database credentials `APP_DB_NAME`, `APP_DB_USER`, and `APP_DB_PASSWORD`.
+The fixture maps them to both MariaDB and Nextcloud; do not supply them.
 
-- `MARIADB_ROOT_PASSWORD`
-- `MARIADB_PASSWORD`
+Configure only these values in PanelTutor Apps; never commit them:
+
 - `NEXTCLOUD_ADMIN_USER`
 - `NEXTCLOUD_ADMIN_PASSWORD`
 - `NEXTCLOUD_TRUSTED_DOMAINS`
@@ -27,8 +29,6 @@ Configure these values in PanelTutor Apps; never commit them:
 
 Optional values:
 
-- `MARIADB_DATABASE` (default `nextcloud`)
-- `MARIADB_USER` (default `nextcloud`)
 - `OVERWRITEPROTOCOL` (default `https`)
 
 ## Acceptance checks
