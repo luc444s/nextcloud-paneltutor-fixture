@@ -1,0 +1,92 @@
+services:
+  db:
+    image: mariadb:11.4
+    user: "999:999"
+    command:
+      - --transaction-isolation=READ-COMMITTED
+      - --binlog-format=ROW
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-nextcloud}
+      MARIADB_USER: ${MARIADB_USER:-nextcloud}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+      MARIADB_AUTO_UPGRADE: "1"
+      MARIADB_DISABLE_UPGRADE_BACKUP: "1"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  redis:
+    image: redis:7.4-alpine
+    user: "999:1000"
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "33:33"
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      MYSQL_HOST: db
+      MYSQL_DATABASE: ${MARIADB_DATABASE:-nextcloud}
+      MYSQL_USER: ${MARIADB_USER:-nextcloud}
+      MYSQL_PASSWORD: ${MARIADB_PASSWORD}
+      REDIS_HOST: redis
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS}
+      OVERWRITEPROTOCOL: ${OVERWRITEPROTOCOL:-https}
+      OVERWRITEHOST: ${OVERWRITEHOST}
+    volumes:
+      - nextcloud-data:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          php -r '$$response = @file_get_contents("http://127.0.0.1:8080/status.php"); exit($$response === false ? 1 : 0);'
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  cron:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "33:33"
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - while true; do php -f /var/www/html/cron.php; sleep 300; done
+    volumes:
+      - nextcloud-data:/var/www/html
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  redis-data:
+  nextcloud-data:
